@@ -1,20 +1,22 @@
-function [d, ax] = gridDistance(self,Pd,thresh,fromCenter,ifplot)
+function [d, ax, center] = gridDistance(self,Pd,thresh,fromCenter,ifplot)
 % Calculates and returns the distance from the center Acorr peak to the
 %
 % Inputs: self -- CMBObject, function assumes self.cel is set
 %         Pd   -- "PeakDistance", the minimum distance between peaks.
 %         Defaults to 7, which works for most cells. Change if issues.
-%         thresh -- If nonempty, don't use peaks smaller than this value.
+%         thresh -- (0.1) If nonempty, don't use peaks smaller than this value.
 %         fromCenter -- If false (default) compute from maximum peak; else compute from center peak.
 %         ifplot -- For debugging mostly. Defaults to 0
 
 %
 % Outputs: d -- The 6 distances (pixels).
+%          ax -- The 6 angles (radians).
+%          center -- Location of the peak from which distance was measured (pixels)
 
 import CMBHOME.*
 
 if ~exist('Pd','var');Pd = 7;end
-if ~exist('thresh', 'var') || isempty(thresh), thresh = -inf; end
+if ~exist('thresh', 'var') || isempty(thresh), thresh = 0.1; end
 if ~exist('fromCenter', 'var') || isempty(fromCenter), fromCenter = false; end
 
 rm = self.RateMap(self.cel);
@@ -51,17 +53,15 @@ colInd = colInd(inds); % now ordered from max to min peak that is still above th
 
 % identify the field for computing distance - either maximum or closest to center of arena
 if fromCenter
-    center = size(rmA) / 2;
-    dFromCenter = vecnorm([rowInd(:), colInd(:)] - center, 2, 2);
+    centerPt = size(rmA) / 2;
+    dFromCenter = vecnorm([rowInd(:), colInd(:)] - centerPt, 2, 2);
     [~, ifield] = min(dFromCenter);
-    rowField = rowInd(ifield);
-    colField = colInd(ifield);
+    center = [rowInd(ifield), colInd(ifield)];
 else
-    rowField = rowInd(1);
-    colField = colInd(1);
+    center = [rowInd(1), colInd(1)];
 end
 
-d = sqrt((rowInd - rowField).^2 + (colInd - colField).^2);
+d = vecnorm([rowInd(:), colInd(:)] - center, 2, 2);
 [d inds] = sort(d,'ascend');
 
 d = d(2:7);
@@ -70,8 +70,8 @@ d = d(2:7);
 
 
 %% Axes
-y = rowInd(inds(2:7)) - rowField;
-x = colInd(inds(2:7)) - colField;
+y = rowInd(inds(2:7)) - center(1);
+x = colInd(inds(2:7)) - center(2);
 
 theta = atan2(x,y);
 

@@ -1,11 +1,12 @@
-function [d, ax, center] = gridDistance(self,Pd,thresh,fromCenter,ifplot)
+function [d, ax, center] = gridDistance(self,Pd,thresh,fromCenter,rateMap,ifplot)
 % Calculates and returns the distance from the center Acorr peak to the
 %
 % Inputs: self -- CMBObject, function assumes self.cel is set
 %         Pd   -- "PeakDistance", the minimum distance between peaks.
 %         Defaults to 7, which works for most cells. Change if issues.
-%         thresh -- (0.1) If nonempty, don't use peaks smaller than this value.
+%         thresh -- (0) If nonempty, don't use peaks smaller than this value.
 %         fromCenter -- If false (default) compute from maximum peak; else compute from center peak.
+%         rateMap -- If nonempty, use this matrix as the rate map rather than computing it
 %         ifplot -- For debugging mostly. Defaults to 0
 
 %
@@ -16,10 +17,14 @@ function [d, ax, center] = gridDistance(self,Pd,thresh,fromCenter,ifplot)
 import CMBHOME.*
 
 if ~exist('Pd','var');Pd = 7;end
-if ~exist('thresh', 'var') || isempty(thresh), thresh = 0.1; end
+if ~exist('thresh', 'var') || isempty(thresh), thresh = 0; end
 if ~exist('fromCenter', 'var') || isempty(fromCenter), fromCenter = false; end
 
-rm = self.RateMap(self.cel);
+if exist('rateMap', 'var') && ~isempty(rateMap)
+    rm = rateMap;
+else
+    rm = self.RateMap(self.cel);
+end
 rmA = CMBHOME.Utils.moserac(rm);
 %%
 [~,maxInds] = CMBHOME.Utils.extrema2(rmA); %linear index
@@ -51,6 +56,14 @@ inds(idelete) = []; %indeces into rowInds and colInd
 rowInd = rowInd(inds);
 colInd = colInd(inds); % now ordered from max to min peak that is still above thresh
 
+if isempty(rowInd)
+    warning('No autocorr peaks in cell [%d, %d]', self.cel(1), self.cel(2));
+    d = [];
+    ax = [];
+    center = [0, 0];
+    return;
+end
+
 % identify the field for computing distance - either maximum or closest to center of arena
 if fromCenter
     centerPt = size(rmA) / 2;
@@ -64,14 +77,15 @@ end
 d = vecnorm([rowInd(:), colInd(:)] - center, 2, 2);
 [d inds] = sort(d,'ascend');
 
-d = d(2:7);
+d = d(2:min(7, end));
 %d = d./2;
 
-
+colInd = colInd(inds(2:min(7, end)));
+rowInd = rowInd(inds(2:min(7, end)));
 
 %% Axes
-y = rowInd(inds(2:7)) - center(1);
-x = colInd(inds(2:7)) - center(2);
+y = rowInd - center(1);
+x = colInd - center(2);
 
 theta = atan2(x,y);
 
@@ -86,8 +100,6 @@ ax(3) = theta(ind1);
 %}
 ax = theta;
 %% ifplot
-colInd = colInd(inds(2:7));
-rowInd = rowInd(inds(2:7));
 
 if ~exist('ifplot','var');ifplot=0;end
 
